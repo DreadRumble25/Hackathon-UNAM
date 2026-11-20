@@ -116,7 +116,9 @@ sh .hackathon/setup.sh          # Windows (PowerShell): .\.hackathon\setup.cmd
 sh .hackathon/setup.sh --check  # Windows: .\.hackathon\setup.cmd --check
 ```
 
-Desarrollo, con el backend y el dashboard en terminales separadas:
+**Inicio rápido en Windows:** doble clic en `iniciar.cmd`, o en una terminal dentro de la carpeta del proyecto `.\iniciar.cmd`. Abre el backend y el frontend en dos ventanas y luego el navegador en http://localhost:5173/. Para detener la app, cierra las ventanas «NFL backend» y «NFL frontend».
+
+Desarrollo manual, con el backend y el dashboard en terminales separadas:
 
 ```bash
 # Backend en http://localhost:8000 (los datos se procesan al arrancar, unos 20-30 s)
