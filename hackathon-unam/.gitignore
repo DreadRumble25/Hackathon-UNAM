@@ -14,3 +14,26 @@ __pycache__/
 *.pem
 *.key
 .aws/
+
+# Datasets del NFL Big Data Bowl (~825 MB): se obtienen aparte, ver README
+data/
+
+# Bitácoras y archivos generados localmente
+setup-log.txt
+*.log
+entrega-*.zip
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+*.tsbuildinfo
+
+# Temporales y archivos del sistema o del editor
+*.tmp
+*.bak
+*.swp
+~$*
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
