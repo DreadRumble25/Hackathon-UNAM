@@ -295,7 +295,8 @@ class Engine:
         self.stage = "construyendo tablas"
 
         pcols = ["gameId", "playId", "week", "possessionTeam", "defensiveTeam", "down", "yardsToGo",
-                 "pff_playAction", "offenseFormation", "quarter", "pff_passCoverageType", "passResult"]
+                 "pff_playAction", "offenseFormation", "quarter", "pff_passCoverageType", "passResult",
+                 "playDescription", "gameClock"]
         base = (pff.merge(plays[pcols], on=["gameId", "playId"])
                 .merge(win[["gameId", "playId", "dur"]], on=["gameId", "playId"], how="left")
                 .merge(phys, on=["gameId", "playId", "nflId"], how="left")
@@ -336,13 +337,18 @@ class Engine:
         B["grupo"] = B.officialPosition.map(BLOCK_GROUP).fillna("OTRO")
         B["defId"] = B.pff_nflIdBlockedPlayer.astype("Int64")
         dinfo = base[["gameId", "playId", "nflId", "pff_role", "pff_positionLinedUp", "displayName", "officialPosition",
-                      "weight", "burst"]].rename(columns={"nflId": "defId", "pff_role": "def_role",
-                                                          "pff_positionLinedUp": "def_lined", "displayName": "def_name",
-                                                          "officialPosition": "def_pos", "weight": "def_weight",
-                                                          "burst": "def_burst"})
+                      "weight", "height_in", "burst", "pff_hit", "pff_hurry", "pff_sack"]].rename(
+            columns={"nflId": "defId", "pff_role": "def_role", "pff_positionLinedUp": "def_lined",
+                     "displayName": "def_name", "officialPosition": "def_pos", "weight": "def_weight",
+                     "height_in": "def_height", "burst": "def_burst", "pff_hit": "def_hit", "pff_hurry": "def_hurry",
+                     "pff_sack": "def_sack"})
         dinfo["defId"] = dinfo.defId.astype("Int64")
         B = B.merge(dinfo, on=["gameId", "playId", "defId"], how="left")
         B["def_grupo"] = np.where(B.defId.isna(), None, B.def_pos.map(RUSH_GROUP).fillna("OTRO"))
+        B["def_pressure"] = B[["def_hit", "def_hurry", "def_sack"]].fillna(0).max(axis=1).astype(int)
+        nbd = B[B.defId.notna()].groupby(["gameId", "playId", "defId"]).size().rename("n_blk_def").reset_index()
+        B = B.merge(nbd, on=["gameId", "playId", "defId"], how="left")
+        B["n_blk_def"] = B.n_blk_def.fillna(0).astype(int)
         B = B.reset_index(drop=True)
 
         self.progress = 0.85
@@ -530,6 +536,13 @@ class Engine:
         rs = self.rush_season
         peers = rs[rs.n_model >= 50]
         self.burst_peers = peers.groupby("pos").burst_med.apply(lambda s: s.dropna().to_numpy()).to_dict()
+        rp = rs[rs.snaps >= 50]
+        self.rate_peers = rp.groupby("pos").tasa_ajustada.apply(lambda s: s.to_numpy()).to_dict()
+        bs = self.block_season
+        bp = bs[bs.snaps >= 50]
+        self.eff_peers = bp.groupby("pos").efectividad_ajustada.apply(lambda s: s.to_numpy()).to_dict()
+        self.game_label = {int(r.gameId): f"S{r.week} · {r.visitorTeamAbbr} @ {r.homeTeamAbbr}"
+                           for r in self.games.itertuples()}
 
     # --------------------------------------------------------------- laboratorio (precalculado)
     def _quintiles(self, df, var, q=5):

@@ -1,58 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Bar, BarChart, CartesianGrid, Cell, ErrorBar, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, Cell, ErrorBar, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api } from '../api'
+import PlayerSearch, { JugadorLista } from '../PlayerSearch'
 import { Badge, Card, ErrorBox, Kpi, Loading, Note, PercentileBar, altura, grupoColor, histogram, int, num, pct, pval } from '../ui'
 
-type Lista = { nflId: number; displayName: string; officialPosition: string; teams: string; rush: number; block: number; grupo: string }[]
-
-export default function Perfil({ nflId, onSelect }: { nflId: number | null; onSelect: (id: number) => void }) {
-  const [lista, setLista] = useState<Lista>([])
-  const [q, setQ] = useState('')
+export default function Perfil({ nflId, lista, onSelect, onCompare }: { nflId: number | null; lista: JugadorLista[]; onSelect: (id: number) => void; onCompare: (id: number) => void }) {
   const [data, setData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
-  const [comparar, setComparar] = useState<number[]>([])
-  const [compData, setCompData] = useState<Record<number, any>>({})
 
-  useEffect(() => { api<Lista>('jugadores').then(setLista).catch((e) => setError(e.message)) }, [])
   useEffect(() => {
     if (!nflId) return
     setData(null)
     api(`jugador/${nflId}`).then((d) => { setData(d); setError(null) }).catch((e) => setError(e.message))
   }, [nflId])
-  useEffect(() => {
-    for (const id of comparar) if (!compData[id]) api(`jugador/${id}`).then((d) => setCompData((c) => ({ ...c, [id]: d }))).catch(() => undefined)
-  }, [comparar, compData])
-
-  const matches = useMemo(() => {
-    const t = q.trim().toLowerCase()
-    if (t.length < 2) return []
-    return lista.filter((p) => p.displayName.toLowerCase().includes(t) || p.teams.toLowerCase().includes(t)).slice(0, 12)
-  }, [q, lista])
 
   return (
     <div className="space-y-4">
       <Card>
         <div className="flex flex-wrap items-end gap-3">
-          <div className="relative w-full max-w-md">
-            <label className="text-xs font-medium text-slate-600">Buscar jugador (nombre o equipo)</label>
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ej. Garrett, Donald, KC…" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none" />
-            {matches.length > 0 && (
-              <ul className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg">
-                {matches.map((p) => (
-                  <li key={p.nflId} className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm hover:bg-slate-50">
-                    <button className="flex-1 text-left" onClick={() => { onSelect(p.nflId); setQ('') }}>
-                      <span className="font-medium">{p.displayName}</span> <span className="text-xs text-slate-500">{p.officialPosition} · {p.teams}</span>
-                      <span className="ml-2 text-[11px] text-slate-400">{p.rush ? `${p.rush} rush` : ''}{p.block ? ` ${p.block} bloq.` : ''}</span>
-                    </button>
-                    {nflId && p.nflId !== nflId && (
-                      <button className="rounded border border-slate-300 px-1.5 text-[11px] text-slate-600 hover:bg-slate-100" onClick={() => { setComparar((c) => (c.includes(p.nflId) || c.length >= 3 ? c : [...c, p.nflId])); setQ('') }}>+ comparar</button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          {!nflId && <p className="text-sm text-slate-500">Selecciona un jugador, o haz clic en un nombre del centro de control.</p>}
+          <div className="w-full max-w-md"><PlayerSearch lista={lista} onPick={(p) => onSelect(p.nflId)} label="Buscar jugador (nombre, equipo o posición)" placeholder="Ej. Garrett, Donald, KC, DT…" /></div>
+          {data && <button className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100" onClick={() => onCompare(data.info.nflId)}>Comparar con otros jugadores →</button>}
+          {!nflId && <p className="text-sm text-slate-500">Selecciona un jugador, o haz clic en un nombre en cualquier módulo.</p>}
         </div>
       </Card>
 
@@ -65,7 +33,6 @@ export default function Perfil({ nflId, onSelect }: { nflId: number | null; onSe
           {data.rush && <Rush d={data} />}
           {data.block && <Block d={data} onSelect={onSelect} />}
           {!data.rush && !data.block && <Note>Este jugador no tiene snaps de pass rush ni de pass block: solo se muestran sus métricas físicas.</Note>}
-          <Comparacion base={data} ids={comparar} datos={compData} onRemove={(id) => setComparar((c) => c.filter((x) => x !== id))} />
         </>
       )}
     </div>
@@ -308,52 +275,5 @@ function Block({ d, onSelect }: { d: any; onSelect: (id: number) => void }) {
         </Card>
       </div>
     </>
-  )
-}
-
-function Comparacion({ base, ids, datos, onRemove }: { base: any; ids: number[]; datos: Record<number, any>; onRemove: (id: number) => void }) {
-  const todos = [base, ...ids.map((id) => datos[id]).filter(Boolean)]
-  if (todos.length < 2) return <Note>Para comparar, busca otro jugador y pulsa «+ comparar» (hasta 3).</Note>
-  const met = (d: any, k: string) => d.fisico.metricas.find((m: any) => m.clave === k)
-  const filas: [string, (d: any) => string, (d: any) => number | null][] = [
-    ['Posición', (d) => d.info.posicion, () => null],
-    ['Peso (lb)', (d) => String(d.info.peso), () => null],
-    ['Burst (yd/s)', (d) => num(met(d, 'burst')?.valor), (d) => met(d, 'burst')?.percentil],
-    ['Getoff (yd)', (d) => num(met(d, 'getoff')?.valor), (d) => met(d, 'getoff')?.percentil],
-    ['Aceleración máx. 1 s', (d) => num(met(d, 'a_max_1s')?.valor), (d) => met(d, 'a_max_1s')?.percentil],
-    ['Velocidad máxima', (d) => num(met(d, 's_max')?.valor), (d) => met(d, 's_max')?.percentil],
-    ['Tasa de presión', (d) => (d.rush ? pct(d.rush.tasa) : '—'), (d) => d.rush?.pct_tasa ?? null],
-    ['Observada / esperada', (d) => (d.rush ? num(d.rush.o_e) : '—'), (d) => d.rush?.pct_oe ?? null],
-    ['Efectividad de bloqueo', (d) => (d.block ? pct(d.block.efectividad) : '—'), (d) => d.block?.pct_efectividad ?? null],
-  ]
-  const chart = filas.slice(2).map(([l, , p]) => ({ metrica: l, ...Object.fromEntries(todos.map((d) => [d.info.nombre, p(d)])) }))
-  const colores = ['#dc2626', '#2563eb', '#0d9488', '#7c3aed']
-  return (
-    <Card title="Comparación entre jugadores" subtitle="Valores y percentil dentro de la posición de cada jugador">
-      <div className="grid gap-4 lg:grid-cols-2">
-        <table className="w-full text-xs">
-          <thead><tr className="border-b border-slate-200 text-left text-slate-500"><th className="py-1">Métrica</th>{todos.map((d, i) => (
-            <th key={d.info.nflId} className="py-1 text-right" style={{ color: colores[i] }}>{d.info.nombre}{i > 0 && <button className="ml-1 text-slate-400 hover:text-rose-600" onClick={() => onRemove(d.info.nflId)}>×</button>}</th>
-          ))}</tr></thead>
-          <tbody>{filas.map(([l, v, p]) => (
-            <tr key={l} className="border-b border-slate-100"><td className="py-1 text-slate-600">{l}</td>{todos.map((d) => <td key={d.info.nflId} className="py-1 text-right tabular-nums">{v(d)}{p(d) !== null && p(d) !== undefined && <span className="ml-1 text-[10px] text-slate-400">p{Number(p(d)).toFixed(0)}</span>}</td>)}</tr>
-          ))}</tbody>
-        </table>
-        <div className="h-72">
-          <ResponsiveContainer>
-            <BarChart data={chart} layout="vertical" margin={{ left: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-              <XAxis type="number" domain={[0, 100]} fontSize={10} />
-              <YAxis type="category" dataKey="metrica" width={130} fontSize={10} interval={0} />
-              <Tooltip formatter={(v: any) => `percentil ${Number(v).toFixed(0)}`} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <ReferenceLine x={50} stroke="#94a3b8" strokeDasharray="4 4" />
-              {todos.map((d, i) => <Bar key={d.info.nflId} dataKey={d.info.nombre} fill={colores[i]} />)}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-      <p className="mt-2 text-[11px] text-slate-500">Cada percentil se calcula frente a jugadores de la misma posición oficial; comparar percentiles entre posiciones distintas indica posición relativa, no igualdad de valores.</p>
-    </Card>
   )
 }

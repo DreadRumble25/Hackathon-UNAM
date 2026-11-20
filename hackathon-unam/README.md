@@ -8,7 +8,23 @@ Plataforma de análisis para entrenadores de la NFL que combina tres enfoques so
 
 Proyecto para el Hackathon NFL Big Data Bowl, UNAM.
 
-> **Estado:** en desarrollo. El backend (motor de datos, modelo y API) ya funciona. El dashboard está en construcción: el centro de control y el perfil de jugador ya están escritos, pero el laboratorio de explosividad y la navegación todavía no.
+> **Estado:** los nueve módulos están integrados y compilan (`npm run build`). Cada uno se verificó contra el backend real.
+
+## Módulos
+
+| # | Módulo | Pregunta del entrenador |
+|---|---|---|
+| 1 | Centro de control | ¿Cómo están mis jugadores y mi equipo frente a la liga? Filtros por equipo, posición, semana, partido y mínimo de oportunidades; observaciones automáticas. |
+| 2 | Perfil de jugador | Peso, estatura, velocidad, aceleración, distancia, burst y getoff con percentiles por posición; rendimiento como rusher o bloqueador, por situación y por semana. |
+| 3 | Laboratorio de explosividad | Quintiles y deciles de burst, EDGE vs IDL, curvas de la regresión logística con IC95, burst habitual vs por jugada, burst vs getoff vs aceleración, robustez. |
+| 4 | Observado vs esperado | Tasa observada, tasa esperada por el modelo, O/E con IC95 y p-valor corregido por sobredispersión; ranking exploratorio. |
+| 5 | Enfrentamientos | Duelos bloqueador–defensor, diferencias físicas dentro de cada tipo de enfrentamiento, dobles equipos, tipos de bloqueo e historial jugada por jugada. |
+| 6 | Comparador | Hasta 4 jugadores de posiciones equivalentes, con valores y percentiles. |
+| 7 | Simulador | Probabilidad estimada de presión con los coeficientes y la covarianza reales del modelo M3. |
+| 8 | Reportes | Resumen imprimible por equipo: fortalezas, áreas a evaluar, situaciones y notas por jugador. |
+| 9 | Metodología | Fórmulas, denominadores, modelo, validación y limitaciones. |
+
+Cada módulo tiene su propia URL (`#lab`, `#sim`, `#perfil/<nflId>`, `#comp/<id1>,<id2>`, etc.).
 
 ## Objetivo
 
@@ -125,6 +141,12 @@ Mientras se preparan los datos, `GET /health` responde de inmediato y `GET /api/
 | `GET /api/jugadores` | Lista de jugadores con datos |
 | `GET /api/jugador/{nflId}` | Perfil físico y de rendimiento con comparación por posición |
 | `GET /api/laboratorio` | Resultados del laboratorio de explosividad (quintiles, deciles, curvas, efectos, robustez) |
+| `GET /api/observado-esperado` | Ranking O/E. Parámetros: `grupo`, `min_snaps`, `equipo` |
+| `GET /api/enfrentamientos` | Resumen de enfrentamientos, físico estratificado, dobles equipos y parejas. Parámetros: `equipo`, `min_pareja` |
+| `GET /api/rivales/{nflId}` | Rivales de un bloqueador o de un defensor |
+| `GET /api/pareja?bloqueador=&defensor=` | Detalle e historial de un enfrentamiento |
+| `GET /api/modelo` | Coeficientes, covarianza robusta y rangos del modelo M3 (para el simulador) |
+| `GET /api/reporte/{equipo}` | Reporte del equipo para el cuerpo técnico. Parámetro: `min_snaps` |
 
 ### Reproducir los análisis estadísticos
 

@@ -9,6 +9,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query
 
+from backend import modulos
 from backend.engine import engine
 
 
@@ -77,3 +78,56 @@ def jugador(nfl_id: int) -> dict:
 def laboratorio() -> dict:
     _ready()
     return engine.lab
+
+
+def _equipo_valido(equipo: Optional[str]) -> Optional[str]:
+    if equipo and equipo not in set(engine.games.homeTeamAbbr) | set(engine.games.visitorTeamAbbr):
+        raise HTTPException(status_code=400, detail="Equipo no reconocido")
+    return equipo or None
+
+
+@app.get("/api/observado-esperado")
+def observado_esperado(
+    grupo: str = Query("TODOS", pattern="^(TODOS|EDGE|IDL)$"),
+    min_snaps: int = Query(100, ge=10, le=300),
+    equipo: Optional[str] = Query(None, max_length=3),
+) -> dict:
+    _ready()
+    return modulos.observado_esperado(engine, grupo, min_snaps, _equipo_valido(equipo))
+
+
+@app.get("/api/enfrentamientos")
+def enfrentamientos(equipo: Optional[str] = Query(None, max_length=3),
+                    min_pareja: int = Query(10, ge=1, le=50)) -> dict:
+    _ready()
+    return modulos.enfrentamientos_resumen(engine, _equipo_valido(equipo), min_pareja)
+
+
+@app.get("/api/rivales/{nfl_id}")
+def rivales(nfl_id: int) -> dict:
+    _ready()
+    return modulos.rivales(engine, nfl_id)
+
+
+@app.get("/api/pareja")
+def pareja(bloqueador: int = Query(...), defensor: int = Query(...)) -> dict:
+    _ready()
+    data = modulos.pareja(engine, bloqueador, defensor)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Estos jugadores no tienen enfrentamientos registrados")
+    return data
+
+
+@app.get("/api/modelo")
+def modelo() -> dict:
+    _ready()
+    return modulos.modelo(engine)
+
+
+@app.get("/api/reporte/{equipo}")
+def reporte(equipo: str, min_snaps: int = Query(50, ge=5, le=300)) -> dict:
+    _ready()
+    data = modulos.reporte(engine, _equipo_valido(equipo), min_snaps)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Equipo sin datos")
+    return data
